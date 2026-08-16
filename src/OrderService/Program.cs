@@ -1,4 +1,7 @@
+using FluentValidation;
 using Microsoft.EntityFrameworkCore;
+using OrderService.Api.Endpoints;
+using OrderService.Application.CreateOrder;
 using OrderService.Infrastructure.Messaging;
 using OrderService.Infrastructure.Persistence;
 
@@ -8,6 +11,14 @@ builder.Services.AddDbContext<OrdersDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("OrdersDb")));
 
 builder.Services.AddOrdersMessaging(builder.Configuration);
+
+// Faz o ASP.NET responder em ProblemDetails também nos erros que ele mesmo
+// gera — corpo JSON malformado, por exemplo. Sem isto, a resposta de validação
+// teria um formato e a de corpo inválido teria outro.
+builder.Services.AddProblemDetails();
+
+builder.Services.AddValidatorsFromAssemblyContaining<CreateOrderValidator>();
+builder.Services.AddScoped<CreateOrderHandler>();
 
 var app = builder.Build();
 
@@ -21,5 +32,7 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.MapGet("/", () => "OrderService");
+
+app.MapOrdersEndpoints();
 
 app.Run();

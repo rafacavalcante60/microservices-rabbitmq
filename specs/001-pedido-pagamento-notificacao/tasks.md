@@ -107,7 +107,7 @@ Legenda: `[ ]` pendente · `[~]` em andamento · `[x]` concluída
 - **Commit:** `feat(orders): T-007 publicar OrderCreated pelo padrão outbox`
 
 ### T-008 — Expor POST /orders
-- [ ] **Depende de:** T-007
+- [x] **Depende de:** T-007
 - **Atende:** RN-14 · CA-1, CA-4, CA-5
 - **Fazer:** caso de uso `CreateOrderHandler` e endpoint mínimo `POST /orders`;
   validação de borda com FluentValidation devolvendo `400` com `ProblemDetails`
