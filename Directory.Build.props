@@ -1,0 +1,21 @@
+<Project>
+
+  <!-- Aplicado a todos os projetos da solução. Centralizar aqui evita que um
+       projeto novo nasça com configuração diferente dos demais. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>12</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- Nullable ligado: o compilador aponta onde um null pode escapar, em vez
+         de a NullReferenceException aparecer em produção. -->
+    <Nullable>enable</Nullable>
+
+    <!-- Warning vira erro: aviso que não quebra o build é aviso que ninguém lê,
+         e a lista cresce até virar ruído permanente. -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+</Project>
