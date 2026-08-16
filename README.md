@@ -4,7 +4,7 @@ Sistema de pedidos de e-commerce em microsserviços, com comunicação por event
 assíncronos no RabbitMQ. O pedido é aceito imediatamente, a cobrança acontece
 depois e o cliente é notificado quando houver resultado.
 
-> Status: em construção, 4 de 28 tarefas concluídas. A fundação
+> Status: em construção, 5 de 28 tarefas concluídas. A fundação
 > (infraestrutura, contratos de evento, domínio de pedidos) está pronta e
 > testada. Os serviços e a mensageria ainda estão em desenvolvimento. O
 > [roadmap](#roadmap) mostra o andamento.
@@ -151,7 +151,7 @@ compila.
 | Etapa | Tarefas | Status |
 |---|---|---|
 | Fundação — solução, Docker Compose, contratos | T-001 → T-003 | ✅ |
-| Domínio de pedidos | T-004 → T-005 | 🔨 em andamento |
+| Domínio de pedidos | T-004 → T-005 | ✅ |
 | OrderService — persistência, outbox, API | T-006 → T-011 | ⬜ |
 | PaymentService — regra, retry, consumidor | T-012 → T-017 | ⬜ |
 | Fluxo completo ponta a ponta | T-018 | ⬜ |
