@@ -482,3 +482,7 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# Ferramentas de IA — configuração local, não faz parte do projeto
+.claude/
+CLAUDE.md
