@@ -5,6 +5,9 @@ public class OrderItem
     public const int MinQuantity = 1;
     public const int MaxQuantity = 100;
 
+    // Construtor do ORM — ver a nota em Order.
+    private OrderItem() => ProductName = null!;
+
     public OrderItem(Guid productId, string productName, int quantity, decimal unitPrice)
     {
         if (productId == Guid.Empty)

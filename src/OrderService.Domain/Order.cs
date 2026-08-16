@@ -6,6 +6,17 @@ public class Order
 
     private readonly List<OrderItem> _items;
 
+    // Construtor do ORM. O EF Core materializa o objeto e depois preenche os
+    // campos — não passa pelas validações, e é isso que se quer: uma linha que
+    // já está no banco foi validada quando nasceu. Fica privado para que só o
+    // EF alcance; o resto do código só tem o construtor público, que valida.
+    private Order()
+    {
+        _items = new List<OrderItem>();
+        IdempotencyKey = null!;
+        Currency = null!;
+    }
+
     // Não existe parâmetro de total: RN-4 / CA-3 são garantidos pela ausência
     // dele, não por uma validação que alguém pode esquecer de chamar.
     public Order(Guid customerId, string idempotencyKey, IEnumerable<OrderItem> items)

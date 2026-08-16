@@ -81,7 +81,7 @@ Legenda: `[ ]` pendente · `[~]` em andamento · `[x]` concluída
 ## Persistência e publicação em Orders
 
 ### T-006 — Persistir pedidos no PostgreSQL
-- [ ] **Depende de:** T-002, T-004
+- [x] **Depende de:** T-002, T-004
 - **Atende:** RN-8, plano §Modelo de dados
 - **Fazer:** `OrdersDbContext` com EF Core e Npgsql; mapeamento de `orders` e
   `order_items`; `status` como texto (D-10), dinheiro como `numeric(18,2)`;
