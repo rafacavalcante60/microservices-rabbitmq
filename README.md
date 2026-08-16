@@ -137,7 +137,6 @@ Painel do RabbitMQ: <http://localhost:15672> (`guest` / `guest`)
 ## Estrutura
 
 ```
-├── CONSTITUTION.md          # regras invioláveis do projeto
 ├── specs/                   # spec, plano e tarefas de cada feature
 ├── src/
 │   ├── Shared.Contracts/    # contratos de evento, sem dependências
@@ -177,7 +176,6 @@ antes de existir uma spec aprovada e um plano derivado dela.
 spec (o quê e por quê) → plano (como) → tarefas → código → teste verde
 ```
 
-- [`CONSTITUTION.md`](CONSTITUTION.md) — os princípios que nenhuma tarefa pode violar
 - [`specs/001-pedido-pagamento-notificacao/spec.md`](specs/001-pedido-pagamento-notificacao/spec.md) — 15 regras de negócio, 16 critérios de aceite, escrita em linguagem de negócio
 - [`specs/001-pedido-pagamento-notificacao/plan.md`](specs/001-pedido-pagamento-notificacao/plan.md) — cada decisão técnica com sua justificativa **e a alternativa descartada**
 
