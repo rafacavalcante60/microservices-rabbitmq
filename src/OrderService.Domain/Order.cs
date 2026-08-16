@@ -58,9 +58,45 @@ public class Order
 
     public OrderStatus Status { get; private set; }
 
+    public string? StatusReason { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
 
     public DateTimeOffset UpdatedAt { get; private set; }
 
     public IReadOnlyList<OrderItem> Items => _items;
+
+    public void MarkAsPaid() => TransitionTo(OrderStatus.Paid, reason: null);
+
+    public void MarkAsDeclined(string reason) => TransitionTo(OrderStatus.PaymentDeclined, RequireReason(reason));
+
+    public void MarkAsFailed(string reason) => TransitionTo(OrderStatus.PaymentFailed, RequireReason(reason));
+
+    // RN-7 / CA-9: a guarda vive aqui, e não no consumidor, porque a regra é do
+    // agregado — qualquer caminho que alcance o pedido obedece a ela.
+    // Ignorar em silêncio é deliberado: com entrega at-least-once, o desfecho
+    // repetido ou atrasado é rotina do transporte, não erro de negócio. Lançar
+    // exceção mandaria a mensagem para a DLQ e acionaria alarme por algo que o
+    // sistema já tratou corretamente.
+    private void TransitionTo(OrderStatus status, string? reason)
+    {
+        if (Status != OrderStatus.Pending)
+        {
+            return;
+        }
+
+        Status = status;
+        StatusReason = reason;
+        UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    private static string RequireReason(string reason)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            throw new ArgumentException("Desfecho negativo precisa de motivo.", nameof(reason));
+        }
+
+        return reason;
+    }
 }

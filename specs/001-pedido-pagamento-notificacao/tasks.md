@@ -63,7 +63,7 @@ Legenda: `[ ]` pendente · `[~]` em andamento · `[x]` concluída
 - **Commit:** `feat(orders): T-004 modelar agregado Order com invariantes`
 
 ### T-005 — Implementar as transições de estado do pedido
-- [ ] **Depende de:** T-004
+- [x] **Depende de:** T-004
 - **Atende:** RN-7 · CA-9
 - **Fazer:** métodos `MarkAsPaid()`, `MarkAsDeclined(reason)`,
   `MarkAsFailed(reason)` no agregado. Transição ocorre **somente** a partir de
