@@ -35,7 +35,7 @@ Legenda: `[ ]` pendente · `[~]` em andamento · `[x]` concluída
 - **Commit:** `chore: T-002 subir infraestrutura no docker compose`
 
 ### T-003 — Definir os contratos de evento
-- [ ] **Depende de:** T-001
+- [x] **Depende de:** T-001
 - **Atende:** princípio VIII, plano §Contratos de mensagem
 - **Fazer:** os quatro `record` em `Shared.Contracts`: `OrderCreated`,
   `PaymentApproved`, `PaymentDeclined`, `PaymentFailed`. Todos com
@@ -50,7 +50,7 @@ Legenda: `[ ]` pendente · `[~]` em andamento · `[x]` concluída
 ## Domínio de pedidos — sem infraestrutura
 
 ### T-004 — Modelar o agregado Order com suas invariantes
-- [ ] **Depende de:** T-001
+- [x] **Depende de:** T-001
 - **Atende:** RN-1, RN-2, RN-3, RN-4, RN-6 · CA-2, CA-3, CA-4, CA-5
 - **Fazer:** entidades `Order` e `OrderItem` em `OrderService.Domain`, sem EF nem
   MassTransit. Construtor recusa pedido sem itens, quantidade fora de 1..100 e
