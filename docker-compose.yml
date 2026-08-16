@@ -1,0 +1,108 @@
+# Infraestrutura de desenvolvimento local.
+#
+# As senhas aqui são fixas e óbvias de propósito: nada neste arquivo sobe para
+# um ambiente real, e um projeto que exige montar um `.env` antes de rodar
+# quebra o "clone e roda" que a constituição define como critério de sucesso.
+#
+# Os quatro serviços .NET entram neste arquivo na T-022. Por ora só as
+# dependências, para que os serviços possam ser rodados pela IDE contra elas.
+
+name: microservices-rabbitmq
+
+services:
+
+  # Caixa de correio entre os serviços. A imagem `-management` traz o painel
+  # web, que é o que torna o fluxo assíncrono visível numa demonstração.
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: mr-rabbitmq
+    ports:
+      - "5672:5672"    # protocolo AMQP — é por aqui que os serviços falam
+      - "15672:15672"  # painel de administração no navegador
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    networks: [backend]
+
+  # Pedidos e pagamentos. Bancos separados por usuário — ver infra/postgres/init.sql.
+  postgres:
+    image: postgres:16-alpine
+    container_name: mr-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      # Tudo em docker-entrypoint-initdb.d roda na primeira inicialização.
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      # Consultar `payments_db` — o último objeto criado pelo init.sql — em vez
+      # de um `pg_isready` genérico: o servidor aceita conexões antes de o
+      # script terminar, e um serviço que subisse nessa janela não acharia o
+      # próprio banco.
+      test: ["CMD-SHELL", "psql -U postgres -d payments_db -c 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks: [backend]
+
+  # Histórico de notificações: documentos append-only, formato variável por canal.
+  mongodb:
+    image: mongo:7
+    container_name: mr-mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: mongo
+      MONGO_INITDB_ROOT_PASSWORD: mongo
+      MONGO_INITDB_DATABASE: notifications_db
+    volumes:
+      - mongodb-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "-u", "mongo", "-p", "mongo",
+             "--authenticationDatabase", "admin",
+             "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks: [backend]
+
+  # Bloco de notas dos consumidores: guarda os MessageId já processados (D-4).
+  # Sem persistência em disco de propósito — perder essas chaves num restart é
+  # aceitável, porque as constraints únicas do Postgres e do Mongo são a
+  # garantia de verdade. O Redis só evita o trabalho repetido.
+  redis:
+    image: redis:7-alpine
+    container_name: mr-redis
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks: [backend]
+
+volumes:
+  rabbitmq-data:
+  postgres-data:
+  mongodb-data:
+
+networks:
+  backend:
+    driver: bridge

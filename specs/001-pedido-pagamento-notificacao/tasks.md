@@ -24,7 +24,7 @@ Legenda: `[ ]` pendente · `[~]` em andamento · `[x]` concluída
 - **Commit:** `chore: T-001 criar solução e estrutura de projetos`
 
 ### T-002 — Subir a infraestrutura no Docker Compose
-- [ ] **Depende de:** —
+- [x] **Depende de:** —
 - **Atende:** critério de sucesso da constituição
 - **Fazer:** `docker-compose.yml` com RabbitMQ (com o painel de administração),
   PostgreSQL (script de init criando `orders_db` e `payments_db` com usuários
@@ -56,7 +56,7 @@ Legenda: `[ ]` pendente · `[~]` em andamento · `[x]` concluída
   MassTransit. Construtor recusa pedido sem itens, quantidade fora de 1..100 e
   preço ≤ 0. `TotalAmount` calculado internamente, nunca recebido. Nasce
   `Pending`. Testes unitários cobrindo cada critério.
-- **Arquivos:** `src/OrderService/Domain/Order.cs`, `OrderItem.cs`,
+- **Arquivos:** `src/OrderService.Domain/Order.cs`, `OrderItem.cs`,
   `OrderStatus.cs`, `tests/OrderService.Domain.Tests/OrderTests.cs`
 - **Verificar:** `dotnet test tests/OrderService.Domain.Tests` → verdes,
   incluindo o caso de itens somando 35,00 com total declarado 1,00 resultando 35,00
@@ -70,7 +70,7 @@ Legenda: `[ ]` pendente · `[~]` em andamento · `[x]` concluída
   `Pending`; em estado final, a chamada é ignorada sem lançar exceção — evento
   duplicado ou atrasado não é erro, é rotina. Testes de cada transição e da
   recusa de transição a partir de cada estado final.
-- **Arquivos:** `src/OrderService/Domain/Order.cs`,
+- **Arquivos:** `src/OrderService.Domain/Order.cs`,
   `tests/OrderService.Domain.Tests/OrderStatusTransitionTests.cs`
 - **Verificar:** `dotnet test --filter Transition` → verdes; um pedido `Paid` que
   recebe `MarkAsDeclined` continua `Paid`
@@ -164,7 +164,7 @@ Legenda: `[ ]` pendente · `[~]` em andamento · `[x]` concluída
 - **Fazer:** entidade `Payment` e a regra determinística: acima de
   R$ 10.000,00 recusa, `10.000,00` exato aprova. Testes nos dois lados do limite
   e no centavo acima.
-- **Arquivos:** `src/PaymentService/Domain/*`,
+- **Arquivos:** `src/PaymentService.Domain/*`,
   `tests/PaymentService.Domain.Tests/*`
 - **Verificar:** `dotnet test tests/PaymentService.Domain.Tests` → verdes,
   com casos de 10.000,00 e 10.000,01
@@ -176,8 +176,8 @@ Legenda: `[ ]` pendente · `[~]` em andamento · `[x]` concluída
 - **Fazer:** interface `IPaymentGateway` e `SimulatedPaymentGateway` aplicando
   RN-10. Um modo de configuração que simula indisponibilidade, para exercitar
   RN-11 nos testes e na demonstração.
-- **Arquivos:** `src/PaymentService/Domain/IPaymentGateway.cs`,
-  `Infrastructure/SimulatedPaymentGateway.cs`
+- **Arquivos:** `src/PaymentService.Domain/IPaymentGateway.cs`,
+  `src/PaymentService/Infrastructure/SimulatedPaymentGateway.cs`
 - **Verificar:** `dotnet test --filter Gateway` → verdes
 - **Commit:** `feat(payments): T-013 criar abstração do gateway de pagamento`
 
