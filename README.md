@@ -120,7 +120,7 @@ variável por canal. A escolha vem do padrão de acesso aos dados, não de moda.
 Requisitos: Docker e .NET 8 SDK.
 
 ```bash
-git clone https://github.com/<usuario>/microservices-rabbitmq.git
+git clone https://github.com/rafacavalcante60/microservices-rabbitmq.git
 cd microservices-rabbitmq
 
 # Sobe RabbitMQ, PostgreSQL, MongoDB e Redis
