@@ -94,7 +94,7 @@ Legenda: `[ ]` pendente · `[~]` em andamento · `[x]` concluída
 - **Commit:** `feat(orders): T-006 persistir pedidos no postgresql`
 
 ### T-007 — Publicar OrderCreated pelo padrão outbox
-- [ ] **Depende de:** T-003, T-006
+- [x] **Depende de:** T-003, T-006
 - **Atende:** princípio V, D-3
 - **Fazer:** MassTransit com RabbitMQ e `AddEntityFrameworkOutbox` sobre o
   `OrdersDbContext`; migration das tabelas de outbox. O evento é gravado **na

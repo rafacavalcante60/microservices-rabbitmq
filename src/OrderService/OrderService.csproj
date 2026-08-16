@@ -7,6 +7,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Versão fixa, e não 8.*, de propósito: a partir da 8.5.0 o MassTransit
+         exige EF Core 9 mesmo em net8.0, e a mistura com o provider do Npgsql 8
+         quebra em tempo de execução (MissingMethodException no repositório de
+         histórico de migrations). A 8.4.1 é a última que mantém a stack inteira
+         no .NET 8 LTS. Subir daqui exige subir o Npgsql junto. -->
+    <PackageReference Include="MassTransit.EntityFrameworkCore" Version="8.4.1" />
+    <PackageReference Include="MassTransit.RabbitMQ" Version="8.4.1" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.*">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>

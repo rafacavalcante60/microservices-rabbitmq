@@ -1,10 +1,13 @@
 using Microsoft.EntityFrameworkCore;
+using OrderService.Infrastructure.Messaging;
 using OrderService.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddDbContext<OrdersDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("OrdersDb")));
+
+builder.Services.AddOrdersMessaging(builder.Configuration);
 
 var app = builder.Build();
 
