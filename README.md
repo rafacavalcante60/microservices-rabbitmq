@@ -4,10 +4,11 @@ Sistema de pedidos de e-commerce em microsserviços, com comunicação por event
 assíncronos no RabbitMQ. O pedido é aceito imediatamente, a cobrança acontece
 depois e o cliente é notificado quando houver resultado.
 
-> Status: em construção, 5 de 28 tarefas concluídas. A fundação
-> (infraestrutura, contratos de evento, domínio de pedidos) está pronta e
-> testada. Os serviços e a mensageria ainda estão em desenvolvimento. O
-> [roadmap](#roadmap) mostra o andamento.
+> Status: em construção, 8 de 28 tarefas concluídas. O `OrderService` já aceita
+> um pedido por `POST /orders`, persiste no PostgreSQL e publica `OrderCreated`
+> pelo padrão outbox — inclusive com o RabbitMQ fora do ar. O `PaymentService` e
+> o `NotificationService` ainda não consomem nada. O [roadmap](#roadmap) mostra
+> o andamento.
 
 ---
 
@@ -61,6 +62,11 @@ erro.
 
 O evento é gravado na mesma transação do pedido, numa tabela `outbox`, e um
 processo separado publica a partir dali.
+
+Isso já é verificável: com o RabbitMQ parado, o `POST /orders` continua
+respondendo `201` e o evento fica esperando na tabela `outbox_message`. Quando o
+broker volta, a linha some da tabela e a mensagem aparece no exchange, sem
+nenhuma intervenção.
 
 ### Consumidores idempotentes
 
@@ -125,7 +131,28 @@ dotnet test
 
 Painel do RabbitMQ: <http://localhost:15672> (`guest` / `guest`)
 
-> Os serviços ainda não sobem pelo Compose, isso chega na T-022.
+Com a infraestrutura de pé, o serviço de pedidos roda direto pelo SDK:
+
+```bash
+dotnet run --project src/OrderService --urls http://localhost:8081
+
+curl -X POST localhost:8081/orders \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "customerId": "11111111-1111-1111-1111-111111111111",
+    "items": [
+      {"productId":"22222222-2222-2222-2222-222222222222","productName":"Teclado","quantity":2,"unitPrice":10.00},
+      {"productId":"33333333-3333-3333-3333-333333333333","productName":"Mouse","quantity":3,"unitPrice":5.00}
+    ]
+  }'
+# 201 → {"orderId":"…","status":"Pending","totalAmount":35.00}
+```
+
+O total nasce da soma dos itens: um `totalAmount` enviado no corpo não é lido,
+porque o campo não existe no contrato de entrada.
+
+> Os serviços ainda não sobem pelo Compose, isso chega na T-022. O pedido também
+> ainda não sai de `Pending`: quem o move é o desfecho do pagamento, na T-018.
 
 ## Estrutura
 
@@ -152,7 +179,8 @@ compila.
 |---|---|---|
 | Fundação — solução, Docker Compose, contratos | T-001 → T-003 | ✅ |
 | Domínio de pedidos | T-004 → T-005 | ✅ |
-| OrderService — persistência, outbox, API | T-006 → T-011 | ⬜ |
+| OrderService — persistência, outbox, `POST /orders` | T-006 → T-008 | ✅ |
+| OrderService — idempotência, consulta, observabilidade | T-009 → T-011 | ⬜ |
 | PaymentService — regra, retry, consumidor | T-012 → T-017 | ⬜ |
 | Fluxo completo ponta a ponta | T-018 | ⬜ |
 | Notificações e API Gateway | T-019 → T-021 | ⬜ |
