@@ -1,31 +1,27 @@
 # Sistema de Pedidos — Microsserviços .NET 8 + RabbitMQ
 
-Sistema de pedidos de e-commerce em microsserviços, comunicando-se **por eventos
-assíncronos** no RabbitMQ. Um pedido é aceito na hora, cobrado em seguida, e o
-cliente é notificado do resultado quando ele existir.
+Sistema de pedidos de e-commerce em microsserviços, com comunicação por eventos
+assíncronos no RabbitMQ. O pedido é aceito imediatamente, a cobrança acontece
+depois e o cliente é notificado quando houver resultado.
 
-> **Status: em construção — 4 de 28 tarefas concluídas.**
-> A fundação (infraestrutura, contratos de evento, domínio de pedidos) está de
-> pé e testada. Os serviços e a mensageria estão em desenvolvimento. O
-> [roadmap](#roadmap) abaixo mostra exatamente onde estou.
+> Status: em construção, 4 de 28 tarefas concluídas. A fundação
+> (infraestrutura, contratos de evento, domínio de pedidos) está pronta e
+> testada. Os serviços e a mensageria ainda estão em desenvolvimento. O
+> [roadmap](#roadmap) mostra o andamento.
 
 ---
 
 ## O problema
 
-Um cliente não pode ficar preso esperando a confirmação de um pagamento que
-depende de um processador externo e pode demorar — ou nunca responder. O sistema
-precisa aceitar o pedido imediatamente e resolver a cobrança depois, sem perder
-nada no caminho.
-
-Isso é um problema de **consistência eventual**, e é onde os sistemas
-distribuídos costumam quebrar de formas silenciosas.
+O cliente não pode ficar esperando a confirmação de um pagamento que depende de
+um processador externo, pode demorar ou pode não responder. O sistema precisa
+aceitar o pedido na hora e resolver a cobrança depois, sem perder nada no
+caminho. É um cenário de consistência eventual.
 
 ## Arquitetura
 
-Três serviços de domínio conversam **exclusivamente por eventos**. Não há
-orquestrador: cada serviço reage a fatos que já aconteceram e ninguém coordena
-ninguém. Isso se chama **coreografia**.
+Três serviços de domínio se comunicam apenas por eventos. Não há orquestrador:
+cada serviço reage a fatos que já aconteceram. Esse modelo se chama coreografia.
 
 ```mermaid
 flowchart LR
@@ -43,55 +39,53 @@ flowchart LR
     NS --- NDB[(MongoDB<br/>notifications)]
 ```
 
-1. O cliente cria o pedido e recebe **na hora** o identificador e a situação
-   `Pending`. Não espera pelo pagamento.
+1. O cliente cria o pedido e recebe de imediato o identificador e a situação
+   `Pending`, sem esperar pelo pagamento.
 2. `OrderService` persiste o pedido e publica `OrderCreated`.
 3. `PaymentService` consome, decide a cobrança e publica um dos três desfechos.
-4. `OrderService` consome o desfecho e move o pedido para seu estado final.
+4. `OrderService` consome o desfecho e move o pedido para o estado final.
 5. `NotificationService` consome o mesmo desfecho, em paralelo, e registra a
    notificação.
 
-Nenhum serviço acessa o banco de outro. Um schema compartilhado seria um
-monólito distribuído — o pior dos dois mundos.
+Nenhum serviço acessa o banco de outro. Um schema compartilhado acoplaria os
+serviços no nível dos dados e tiraria a possibilidade de evoluí-los em separado.
 
-## Decisões que sustentam o projeto
+## Decisões técnicas
 
-### Outbox: publicar evento e gravar no banco viram uma operação só
+### Outbox
 
 Salvar o pedido no PostgreSQL e publicar `OrderCreated` no RabbitMQ são duas
-operações em dois sistemas diferentes. Se a segunda falha depois da primeira, o
-pedido existe e **ninguém nunca fica sabendo** — o sistema fica permanentemente
-inconsistente sem gerar um único erro.
+operações em sistemas diferentes. Se a segunda falha depois da primeira, o
+pedido existe e ninguém fica sabendo, e o sistema fica inconsistente sem gerar
+erro.
 
 O evento é gravado na mesma transação do pedido, numa tabela `outbox`, e um
-processo separado publica a partir dali. Ou os dois acontecem, ou nenhum.
+processo separado publica a partir dali.
 
-### Todo consumidor é idempotente
+### Consumidores idempotentes
 
-RabbitMQ garante entrega **pelo menos uma vez**. Mensagem repetida não é
-hipótese remota, é garantia operacional: um `ack` perdido e a mesma mensagem
-chega de novo.
+RabbitMQ garante entrega pelo menos uma vez, então mensagem repetida é um caso
+normal: basta um `ack` se perder para a mesma mensagem chegar de novo.
 
-Cada consumidor registra o `MessageId` no Redis e descarta em silêncio o que já
-processou. Como rede de segurança final, o banco tem restrições únicas
-(`payments.order_id`, `notifications.orderId`) — se o Redis cair, o sistema
-continua correto.
+Cada consumidor registra o `MessageId` no Redis e descarta o que já processou.
+Como garantia adicional, o banco tem restrições únicas (`payments.order_id`,
+`notifications.orderId`), então o comportamento continua correto mesmo se o
+Redis ficar indisponível.
 
-### Falha é estado esperado, não exceção
+### Tratamento de falhas
 
-Retry com backoff exponencial e **dead-letter queue** em todo consumidor.
-Mensagem que falhou 5 vezes vai para a DLQ e gera log de erro — nunca é
-descartada em silêncio, nunca fica em loop infinito de reentrega.
+Retry com backoff exponencial e dead-letter queue em todo consumidor. Mensagem
+que falhou 5 vezes vai para a DLQ e gera log de erro, em vez de ser descartada
+ou reentregue indefinidamente.
 
-O domínio distingue **pagamento recusado** (o processador respondeu "não", é
-decisão de negócio) de **pagamento falhou** (o processador não respondeu, é
-problema técnico). Para quem dá suporte, a diferença muda a ação.
+O domínio separa pagamento recusado (o processador respondeu "não", é decisão de
+negócio) de pagamento falhou (o processador não respondeu, é problema técnico).
+A ação de suporte é diferente em cada caso.
 
-### Rastreabilidade ponta a ponta
+### Rastreabilidade
 
-Todo evento carrega um `CorrelationId` que nasce no gateway e atravessa a
-cadeia inteira. Sem isso, depurar um fluxo assíncrono de três saltos é
-adivinhação.
+Todo evento carrega um `CorrelationId` que nasce no gateway e atravessa a cadeia
+inteira, o que permite seguir um fluxo assíncrono de três saltos nos logs.
 
 ## Stack
 
@@ -107,13 +101,12 @@ adivinhação.
 | Testes | xUnit + FluentAssertions + Testcontainers |
 | Orquestração local | Docker Compose |
 
-**Por que MassTransit e não `RabbitMQ.Client` puro:** retry, DLQ, serialização e
-outbox prontos e testados em produção. Escrever isso à mão consumiria o projeto
-inteiro em encanamento em vez de arquitetura.
+MassTransit em vez de `RabbitMQ.Client` puro porque já traz retry, DLQ,
+serialização e outbox prontos, o que evita reimplementar essa camada à mão.
 
-**Por que dois tipos de banco:** Orders e Payments precisam de transação e
-integridade referencial. Notifications é histórico *append-only* de formato
-variável por canal. A escolha vem do padrão de acesso aos dados, não de moda.
+Dois tipos de banco porque os padrões de acesso são diferentes: Orders e
+Payments precisam de transação e integridade referencial; Notifications é
+histórico append-only, com formato que varia por canal.
 
 ## Rodando localmente
 
@@ -126,13 +119,13 @@ cd microservices-rabbitmq
 # Sobe RabbitMQ, PostgreSQL, MongoDB e Redis
 docker compose up -d
 
-# Testes de domínio — rodam sem infraestrutura, em milissegundos
+# Testes de domínio, rodam sem infraestrutura
 dotnet test
 ```
 
 Painel do RabbitMQ: <http://localhost:15672> (`guest` / `guest`)
 
-> Os serviços ainda não sobem pelo Compose — isso chega na T-022.
+> Os serviços ainda não sobem pelo Compose, isso chega na T-022.
 
 ## Estrutura
 
@@ -149,9 +142,9 @@ Painel do RabbitMQ: <http://localhost:15672> (`guest` / `guest`)
 ```
 
 Cada serviço segue `Api` → `Application` → `Domain` ← `Infrastructure`, com as
-dependências apontando para dentro. O domínio é um **projeto separado com zero
-`PackageReference`** — assim o compilador impede um `using` de EF Core nas
-regras de negócio, em vez de depender da disciplina de quem escreve.
+dependências apontando para dentro. O domínio é um projeto separado sem nenhum
+`PackageReference`, então um `using` de EF Core nas regras de negócio não
+compila.
 
 ## Roadmap
 
@@ -169,15 +162,14 @@ regras de negócio, em vez de depender da disciplina de quem escreve.
 
 ## Como este projeto é construído
 
-Desenvolvimento **spec-driven**: nenhuma linha de código de produção é escrita
-antes de existir uma spec aprovada e um plano derivado dela.
+Desenvolvimento spec-driven: nenhuma linha de código de produção é escrita antes
+de existir uma spec aprovada e um plano derivado dela.
 
 ```
 spec (o quê e por quê) → plano (como) → tarefas → código → teste verde
 ```
 
-- [`specs/001-pedido-pagamento-notificacao/spec.md`](specs/001-pedido-pagamento-notificacao/spec.md) — 15 regras de negócio, 16 critérios de aceite, escrita em linguagem de negócio
-- [`specs/001-pedido-pagamento-notificacao/plan.md`](specs/001-pedido-pagamento-notificacao/plan.md) — cada decisão técnica com sua justificativa **e a alternativa descartada**
+- [`specs/001-pedido-pagamento-notificacao/spec.md`](specs/001-pedido-pagamento-notificacao/spec.md) — 15 regras de negócio e 16 critérios de aceite, em linguagem de negócio
+- [`specs/001-pedido-pagamento-notificacao/plan.md`](specs/001-pedido-pagamento-notificacao/plan.md) — cada decisão técnica com a justificativa e a alternativa descartada
 
-Um commit por tarefa. O `git log` é o registro de como o sistema foi construído,
-na ordem em que foi pensado.
+Um commit por tarefa concluída.
