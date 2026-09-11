@@ -143,7 +143,7 @@ Legenda: `[ ]` pendente · `[~]` em andamento · `[x]` concluída
 - **Commit:** `feat(orders): T-010 expor consulta de pedido por id`
 
 ### T-011 — Adicionar observabilidade e health checks
-- [ ] **Depende de:** T-008
+- [x] **Depende de:** T-008
 - **Atende:** princípios VI e VII · D-13
 - **Fazer:** projeto `BuildingBlocks` com Serilog em JSON, middleware que lê ou
   gera o `X-Correlation-Id` e o enriquece nos logs, e extensões de health check.
