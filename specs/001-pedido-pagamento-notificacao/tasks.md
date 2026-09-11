@@ -317,7 +317,7 @@ Legenda: `[ ]` pendente · `[~]` em andamento · `[x]` concluída
 - **Commit:** `test: T-023 montar base de testes com testcontainers`
 
 ### T-024 — Testar o fluxo ponta a ponta, aprovado e recusado
-- [ ] **Depende de:** T-023
+- [x] **Depende de:** T-023
 - **Atende:** CA-1, CA-6, CA-7, CA-8, CA-15
 - **Fazer:** dois testes atravessando os três serviços: pedido de R$ 500,00 →
   `Paid` + uma notificação de confirmação; pedido de R$ 10.000,01 →
