@@ -67,7 +67,14 @@ public static class MessagingExtensions
                 // fila `_error` com log, nunca é descartado (princípio VI).
                 rabbit.UseMessageRetry(retry => retry.Interval(3, TimeSpan.FromSeconds(2)));
 
-                rabbit.ConfigureEndpoints(context);
+                // D-15. O prefixo é o que dá a cada serviço a **sua** fila.
+                // Sem ele o MassTransit nomeia a fila só pelo tipo da mensagem,
+                // e dois serviços que assinam o mesmo evento acabam na mesma
+                // fila — viram competing consumers e cada evento chega a só um
+                // deles. O exchange continua um só; o que muda é ter duas filas
+                // ligadas a ele em vez de uma disputada.
+                rabbit.ConfigureEndpoints(
+                    context, new KebabCaseEndpointNameFormatter(prefix: "orders", includeNamespace: false));
             });
         });
 

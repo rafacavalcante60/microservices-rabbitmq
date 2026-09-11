@@ -249,7 +249,7 @@ Legenda: `[ ]` pendente · `[~]` em andamento · `[x]` concluída
 ## Notificações
 
 ### T-019 — Registrar notificações no MongoDB
-- [ ] **Depende de:** T-002, T-016, T-017
+- [x] **Depende de:** T-002, T-016, T-017
 - **Atende:** RN-12, RN-13 · CA-6, CA-7, CA-10
 - **Fazer:** `NotificationService` consumindo os três desfechos e inserindo na
   coleção `notifications`. **Índice único em `orderId`** garantindo exatamente

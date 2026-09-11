@@ -298,6 +298,7 @@ acoplamento síncrono, que é justamente o que a arquitetura evita.
 | **D-12** | Gateway HTTP | YARP | Nativo .NET, configuração declarativa em `appsettings` | Ocelot (menos mantido), Nginx (mais uma stack) |
 | **D-13** | Logs | Serilog com saída JSON e enricher de `CorrelationId` | Princípio VII: sem correlação, depurar 3 saltos assíncronos é impossível | `ILogger` padrão com saída texto — não correlaciona |
 | **D-14** | Migrations | EF Core Migrations, aplicadas no startup do serviço | Um `docker compose up` e o sistema funciona, sem passo manual (critério de sucesso da constituição) | Script SQL manual — quebra o "clone e roda" |
+| **D-15** | Nome das filas de consumidor | `KebabCaseEndpointNameFormatter` com **prefixo do serviço** (`orders-payment-approved`, `notifications-payment-approved`) | Descoberto na T-019: o nome padrão do MassTransit deriva só do tipo da mensagem, então OrderService e NotificationService assinariam a **mesma fila** e virariam *competing consumers* — cada desfecho chegaria a um só dos dois, alternadamente. O prefixo dá a cada serviço a sua própria fila ligada ao mesmo exchange, que é o fan-out que os passos 11 e 12 do fluxo pressupõem | Deixar o padrão — silencioso e catastrófico: metade dos pedidos ficaria sem notificação e metade sem transição de estado, sem erro em lugar nenhum |
 
 ## Riscos e modos de falha
 
