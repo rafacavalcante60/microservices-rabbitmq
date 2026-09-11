@@ -25,6 +25,13 @@ public class CorrelationIdMiddleware(RequestDelegate next)
         // aqui e o cliente ainda não o conhecia.
         context.Response.Headers[HeaderName] = correlationId;
 
+        // Escrito de volta no **request**, e não só no response: o YARP
+        // encaminha os headers da requisição que recebeu, então um
+        // CorrelationId gerado aqui e guardado só no response morreria no
+        // gateway. Esta linha é o que faz o identificador nascido na borda
+        // chegar ao OrderService — e de lá, pelo evento, aos outros dois.
+        context.Request.Headers[HeaderName] = correlationId;
+
         // Guardado no HttpContext para que o resto da requisição o alcance sem
         // precisar reler o header.
         context.Items[HeaderName] = correlationId;

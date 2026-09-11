@@ -275,7 +275,7 @@ Legenda: `[ ]` pendente · `[~]` em andamento · `[x]` concluída
 ## Borda e empacotamento
 
 ### T-021 — Criar o API Gateway
-- [ ] **Depende de:** T-010, T-020
+- [x] **Depende de:** T-010, T-020
 - **Atende:** D-12, princípio VII
 - **Fazer:** YARP roteando `/orders/**` → OrderService e `/notifications/**` →
   NotificationService, configurado em `appsettings`. Middleware de

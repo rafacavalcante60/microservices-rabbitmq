@@ -13,6 +13,7 @@ public class CreateOrderHandler(OrdersDbContext dbContext, IPublishEndpoint publ
     public async Task<CreateOrderResult> HandleAsync(
         CreateOrderRequest request,
         string idempotencyKey,
+        Guid correlationId,
         CancellationToken cancellationToken)
     {
         var items = request.Items!.Select(item => new OrderItem(
@@ -25,10 +26,15 @@ public class CreateOrderHandler(OrdersDbContext dbContext, IPublishEndpoint publ
 
         dbContext.Orders.Add(order);
 
-        // Princípio VII: o CorrelationId deveria nascer na borda, no gateway
-        // (T-021). Enquanto o gateway não existe, ele nasce aqui — o importante
-        // é que o evento nunca viaje sem um.
-        var correlationId = Guid.NewGuid();
+        // Princípio VII. O CorrelationId chega pronto da borda (T-021): nasceu
+        // no gateway, veio no header até aqui e agora entra no evento. É a
+        // passagem do mundo síncrono para o assíncrono — daqui em diante ele
+        // viaja na mensagem, não no header, e é o que liga o POST do cliente aos
+        // logs do PaymentService e do NotificationService dois saltos adiante.
+        //
+        // Recebido por parâmetro, e não lido de um IHttpContextAccessor: o
+        // handler não precisa saber que existe HTTP do outro lado, e testá-lo
+        // não exige montar um HttpContext falso.
 
         // Este `Publish` não fala com o RabbitMQ. Por causa do `UseBusOutbox()`
         // configurado em T-007, o IPublishEndpoint deste escopo grava o evento

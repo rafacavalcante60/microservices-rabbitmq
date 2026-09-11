@@ -1,3 +1,4 @@
+using BuildingBlocks.Observability;
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using OrderService.Application.CreateOrder;
@@ -29,6 +30,7 @@ public static class OrdersEndpoints
         [FromHeader(Name = IdempotencyKeyHeader)] string? idempotencyKey,
         IValidator<CreateOrderRequest> validator,
         CreateOrderHandler handler,
+        HttpContext httpContext,
         CancellationToken cancellationToken)
     {
         var validation = await validator.ValidateAsync(request, cancellationToken);
@@ -59,7 +61,19 @@ public static class OrdersEndpoints
         // O `!` é necessário porque a garantia de não-nulo está espalhada em
         // dois passos: o `if` acima registrou a violação, e o `if` seguinte
         // saiu. A análise de fluxo do compilador não atravessa essa separação.
-        var result = await handler.HandleAsync(request, idempotencyKey!, cancellationToken);
+        // Princípio VII. Atrás do gateway o identificador sempre chega pronto;
+        // o fallback cobre a chamada direta ao serviço com um header ausente ou
+        // que não seja um Guid. Evento sem CorrelationId é evento que ninguém
+        // consegue rastrear depois, então gerar um é melhor que publicar vazio.
+        var correlationId = httpContext.GetCorrelationId();
+
+        if (correlationId == Guid.Empty)
+        {
+            correlationId = Guid.NewGuid();
+        }
+
+        var result = await handler.HandleAsync(
+            request, idempotencyKey!, correlationId, cancellationToken);
 
         // CA-11: 200 na repetição, e não 201, porque nada foi criado desta vez.
         // O cliente que não distingue os dois continua funcionando; o que
