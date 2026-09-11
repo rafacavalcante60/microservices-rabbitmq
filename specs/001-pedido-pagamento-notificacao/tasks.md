@@ -182,7 +182,7 @@ Legenda: `[ ]` pendente · `[~]` em andamento · `[x]` concluída
 - **Commit:** `feat(payments): T-013 criar abstração do gateway de pagamento`
 
 ### T-014 — Implementar a política de retry do gateway
-- [ ] **Depende de:** T-013
+- [x] **Depende de:** T-013
 - **Atende:** RN-11 · CA-13, CA-14
 - **Fazer:** política Polly com 5 tentativas e backoff exponencial em volta da
   chamada ao gateway (D-6). Esgotadas, o desfecho é `Failed`. Testes com um
