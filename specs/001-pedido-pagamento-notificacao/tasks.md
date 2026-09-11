@@ -358,7 +358,7 @@ Legenda: `[ ]` pendente · `[~]` em andamento · `[x]` concluída
 ## Documentação
 
 ### T-027 — Escrever o ADR do outbox e a visão de arquitetura
-- [ ] **Depende de:** T-018
+- [x] **Depende de:** T-018
 - **Atende:** decisão D-3 (meio-termo acordado)
 - **Fazer:** `docs/decisions/0001-outbox.md` explicando o mecanismo por dentro —
   a tabela, a transação compartilhada, o processo publicador, e o que acontece se
