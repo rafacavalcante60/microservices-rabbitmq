@@ -53,6 +53,9 @@ serviços no nível dos dados e tiraria a possibilidade de evoluí-los em separa
 
 ## Decisões técnicas
 
+As decisões abaixo valem para o sistema inteiro, mas nem todas já estão em
+código. As que ainda não estão trazem um aviso com a tarefa em que chegam.
+
 ### Outbox
 
 Salvar o pedido no PostgreSQL e publicar `OrderCreated` no RabbitMQ são duas
@@ -70,28 +73,46 @@ nenhuma intervenção.
 
 ### Consumidores idempotentes
 
+> Parcial: vale para o PaymentService (T-016, T-017). Chega ao OrderService e ao
+> NotificationService nas T-018 e T-019.
+
 RabbitMQ garante entrega pelo menos uma vez, então mensagem repetida é um caso
 normal: basta um `ack` se perder para a mesma mensagem chegar de novo.
 
-Cada consumidor registra o `MessageId` no Redis e descarta o que já processou.
-Como garantia adicional, o banco tem restrições únicas (`payments.order_id`,
-`notifications.orderId`), então o comportamento continua correto mesmo se o
-Redis ficar indisponível.
+Um filtro no pipeline do MassTransit registra o `MessageId` no Redis com
+`SET NX EX` e descarta o que já foi processado, sem que nenhum consumidor
+precise lembrar de se proteger. Como garantia adicional, o banco tem restrições
+únicas (`payments.order_id`, e `notifications.orderId` na T-019): se o Redis
+ficar indisponível, o filtro falha aberto e é a constraint que impede o dano.
 
 ### Tratamento de falhas
 
-Retry com backoff exponencial e dead-letter queue em todo consumidor. Mensagem
-que falhou 5 vezes vai para a DLQ e gera log de erro, em vez de ser descartada
-ou reentregue indefinidamente.
-
 O domínio separa pagamento recusado (o processador respondeu "não", é decisão de
 negócio) de pagamento falhou (o processador não respondeu, é problema técnico).
-A ação de suporte é diferente em cada caso.
+A ação de suporte é diferente em cada caso, e por isso são dois eventos
+distintos em `Shared.Contracts`.
+
+> Parcial: vale para o PaymentService (T-014, T-017). Os demais consumidores
+> chegam nas T-018 e T-019.
+
+São **dois** retries, e eles não se confundem. A chamada ao processador tem
+política Polly de 5 tentativas com backoff exponencial: esgotadas, o desfecho é
+`PaymentFailed` e o cliente é notificado — falha de gateway é caminho de
+negócio, não incidente. O consumidor tem o retry do MassTransit, de 3
+tentativas, para falha de infraestrutura (o banco caiu); o que falhar nas três
+vai para a dead-letter queue com log de erro, nunca descartado em silêncio.
+
+Juntar os dois faria um Postgres fora do ar virar "pagamento recusado" na cara
+do cliente.
 
 ### Rastreabilidade
 
-Todo evento carrega um `CorrelationId` que nasce no gateway e atravessa a cadeia
-inteira, o que permite seguir um fluxo assíncrono de três saltos nos logs.
+> Parcial: o identificador já atravessa Orders → Payments e aparece nos logs
+> JSON dos dois. Ele passa a nascer no gateway na T-021; hoje nasce na criação
+> do pedido.
+
+Todo evento carrega um `CorrelationId` propagado pela cadeia inteira, o que
+permite seguir um fluxo assíncrono de três saltos nos logs.
 
 ## Stack
 
