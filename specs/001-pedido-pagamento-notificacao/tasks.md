@@ -171,7 +171,7 @@ Legenda: `[ ]` pendente · `[~]` em andamento · `[x]` concluída
 - **Commit:** `feat(payments): T-012 modelar agregado Payment e regra de aprovação`
 
 ### T-013 — Criar a abstração do gateway de pagamento
-- [ ] **Depende de:** T-012
+- [x] **Depende de:** T-012
 - **Atende:** D-8
 - **Fazer:** interface `IPaymentGateway` e `SimulatedPaymentGateway` aplicando
   RN-10. Um modo de configuração que simula indisponibilidade, para exercitar
