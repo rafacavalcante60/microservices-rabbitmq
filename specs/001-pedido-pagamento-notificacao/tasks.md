@@ -286,7 +286,7 @@ Legenda: `[ ]` pendente · `[~]` em andamento · `[x]` concluída
 - **Commit:** `feat(gateway): T-021 criar api gateway com yarp`
 
 ### T-022 — Empacotar tudo em contêineres 🏁
-- [ ] **Depende de:** T-021
+- [x] **Depende de:** T-021
 - **Atende:** critério de sucesso da constituição
 - **Fazer:** `Dockerfile` multi-stage para cada serviço; estender o
   `docker-compose.yml` com os quatro serviços, variáveis de ambiente,

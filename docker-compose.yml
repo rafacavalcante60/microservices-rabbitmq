@@ -4,8 +4,9 @@
 # um ambiente real, e um projeto que exige montar um `.env` antes de rodar
 # quebra o "clone e roda" que a constituição define como critério de sucesso.
 #
-# Os quatro serviços .NET entram neste arquivo na T-022. Por ora só as
-# dependências, para que os serviços possam ser rodados pela IDE contra elas.
+# Sobe o sistema inteiro: infraestrutura e os quatro serviços .NET. Um
+# `docker compose up --build` e um `curl` em localhost:8080 é o critério de
+# sucesso da constituição.
 
 name: microservices-rabbitmq
 
@@ -96,6 +97,114 @@ services:
       timeout: 5s
       retries: 10
       start_period: 10s
+    networks: [backend]
+
+  # ---------------------------------------------------------------------------
+  # Serviços .NET
+  #
+  # Todos escutam 8080 **dentro** do contêiner e se falam pelo nome do serviço na
+  # rede `backend` — `postgres`, `rabbitmq`, `mongodb`, `redis` são resolvidos
+  # pelo DNS interno do compose. As portas publicadas no host existem só para o
+  # `curl` de demonstração e para depurar; a comunicação real não passa por elas.
+  #
+  # As connection strings chegam por variável de ambiente e sobrescrevem o
+  # appsettings.json, que continua apontando para localhost — é isso que permite
+  # rodar pela IDE contra a mesma infraestrutura, sem dois arquivos de config
+  # divergindo. O `__` é como o .NET representa aninhamento de configuração.
+  # ---------------------------------------------------------------------------
+
+  orderservice:
+    build:
+      # Contexto na raiz, e não na pasta do serviço: o build precisa alcançar
+      # Directory.Build.props e os projetos referenciados (BuildingBlocks,
+      # Shared.Contracts, OrderService.Domain). Um contexto por pasta obrigaria
+      # a duplicar esses projetos dentro de cada serviço.
+      context: .
+      dockerfile: src/OrderService/Dockerfile
+    container_name: mr-orderservice
+    ports:
+      - "8081:8080"
+    environment:
+      ConnectionStrings__OrdersDb: "Host=postgres;Port=5432;Database=orders_db;Username=orders_user;Password=orders_pw"
+      ConnectionStrings__RabbitMq: "amqp://guest:guest@rabbitmq:5672"
+      ConnectionStrings__Redis: "redis:6379"
+    depends_on:
+      # `service_healthy` e não `service_started`: o OrderService aplica as
+      # migrations no startup (D-14) e abre conexão com o broker antes de
+      # responder. Subir junto com um Postgres que ainda está inicializando faria
+      # o contêiner morrer e reiniciar em loop no primeiro `up` de uma máquina
+      # limpa — justamente a experiência que esta tarefa existe para evitar.
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: on-failure
+    networks: [backend]
+
+  paymentservice:
+    build:
+      context: .
+      dockerfile: src/PaymentService/Dockerfile
+    container_name: mr-paymentservice
+    ports:
+      - "8082:8080"
+    environment:
+      ConnectionStrings__PaymentsDb: "Host=postgres;Port=5432;Database=payments_db;Username=payments_user;Password=payments_pw"
+      ConnectionStrings__RabbitMq: "amqp://guest:guest@rabbitmq:5672"
+      ConnectionStrings__Redis: "redis:6379"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: on-failure
+    networks: [backend]
+
+  notificationservice:
+    build:
+      context: .
+      dockerfile: src/NotificationService/Dockerfile
+    container_name: mr-notificationservice
+    ports:
+      - "8083:8080"
+    environment:
+      Mongo__ConnectionString: "mongodb://mongo:mongo@mongodb:27017/?authSource=admin"
+      ConnectionStrings__RabbitMq: "amqp://guest:guest@rabbitmq:5672"
+      ConnectionStrings__Redis: "redis:6379"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: on-failure
+    networks: [backend]
+
+  apigateway:
+    build:
+      context: .
+      dockerfile: src/ApiGateway/Dockerfile
+    container_name: mr-apigateway
+    ports:
+      # A única porta que um cliente precisa conhecer (plan.md §Endpoints HTTP).
+      - "8080:8080"
+    environment:
+      ReverseProxy__Clusters__orders__Destinations__primary__Address: "http://orderservice:8080/"
+      ReverseProxy__Clusters__notifications__Destinations__primary__Address: "http://notificationservice:8080/"
+    depends_on:
+      # Espera os destinos ficarem prontos só para o primeiro `curl` não bater
+      # num 502. O gateway **não** depende deles para continuar de pé depois:
+      # o /health/ready dele não checa o que está atrás (ver ApiGateway/Program.cs).
+      orderservice:
+        condition: service_healthy
+      notificationservice:
+        condition: service_healthy
+    restart: on-failure
     networks: [backend]
 
 volumes:

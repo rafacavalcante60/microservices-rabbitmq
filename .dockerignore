@@ -1,0 +1,20 @@
+# Tudo que não precisa ir no contexto de build. Sem isto, o `docker build` sobe
+# centenas de MB de bin/ e obj/ da máquina para o daemon a cada build — e, pior,
+# artefatos compilados no host podem sobrescrever os do contêiner e produzir uma
+# imagem que funciona aqui e falha em qualquer outro lugar.
+**/bin/
+**/obj/
+**/.vs/
+**/.vscode/
+.git/
+.gitignore
+.claude/
+
+# Nada disso entra em imagem de produção.
+**/*.user
+specs/
+docs/
+tests/
+*.md
+docker-compose*.yml
+.dockerignore
