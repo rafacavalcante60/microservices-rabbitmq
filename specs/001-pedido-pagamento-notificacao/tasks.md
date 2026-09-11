@@ -120,7 +120,7 @@ Legenda: `[ ]` pendente · `[~]` em andamento · `[x]` concluída
 - **Commit:** `feat(orders): T-008 expor endpoint de criação de pedido`
 
 ### T-009 — Garantir idempotência na criação do pedido
-- [ ] **Depende de:** T-008
+- [x] **Depende de:** T-008
 - **Atende:** RN-8 · CA-11, CA-12
 - **Fazer:** header `Idempotency-Key` obrigatório; ao violar o índice único
   `(customer_id, idempotency_key)`, capturar a exceção do Postgres, buscar o

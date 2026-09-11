@@ -6,6 +6,13 @@ namespace OrderService.Infrastructure.Persistence.Configurations;
 
 public class OrderConfiguration : IEntityTypeConfiguration<Order>
 {
+    // O nome vive numa constante porque dois lugares dependem dele: a criação
+    // do índice, aqui, e o `CreateOrderHandler`, que reconhece *esta* violação
+    // de unicidade pelo nome para tratá-la como repetição (D-5). Renomear o
+    // índice sem a constante faria o handler parar de reconhecê-lo em silêncio,
+    // e a falha apareceria como erro 500 numa repetição legítima.
+    public const string UniqueIdempotencyIndexName = "ix_orders_customer_id_idempotency_key";
+
     public void Configure(EntityTypeBuilder<Order> builder)
     {
         builder.ToTable("orders");
@@ -53,7 +60,7 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
         // furar — é o banco recusando a segunda inserção.
         builder.HasIndex(order => new { order.CustomerId, order.IdempotencyKey })
             .IsUnique()
-            .HasDatabaseName("ix_orders_customer_id_idempotency_key");
+            .HasDatabaseName(UniqueIdempotencyIndexName);
 
         builder.HasIndex(order => order.Status).HasDatabaseName("ix_orders_status");
 
