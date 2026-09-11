@@ -195,7 +195,7 @@ Legenda: `[ ]` pendente · `[~]` em andamento · `[x]` concluída
 - **Commit:** `feat(payments): T-014 implementar política de retry do gateway`
 
 ### T-015 — Persistir pagamentos no PostgreSQL
-- [ ] **Depende de:** T-002, T-012
+- [x] **Depende de:** T-002, T-012
 - **Atende:** RN-9 · CA-10
 - **Fazer:** `PaymentsDbContext` em `payments_db`; **restrição única em
   `order_id`**, que é a garantia final contra cobrança dupla; migration no
