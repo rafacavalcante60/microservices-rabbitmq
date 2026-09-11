@@ -206,7 +206,7 @@ Legenda: `[ ]` pendente · `[~]` em andamento · `[x]` concluída
 - **Commit:** `feat(payments): T-015 persistir pagamentos no postgresql`
 
 ### T-016 — Criar o filtro de idempotência de consumidor
-- [ ] **Depende de:** T-002, T-011
+- [x] **Depende de:** T-002, T-011
 - **Atende:** princípio IV · D-4, R-4
 - **Fazer:** filtro do MassTransit que consulta o Redis por
   `idem:{consumer}:{messageId}` com `SET NX EX 7d`; mensagem já vista é

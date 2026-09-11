@@ -29,6 +29,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NotificationService", "src\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PaymentService.Domain.Tests", "tests\PaymentService.Domain.Tests\PaymentService.Domain.Tests.csproj", "{1DCF3EF7-E583-4CBA-9A49-0F501626A9FE}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BuildingBlocks.Tests", "tests\BuildingBlocks.Tests\BuildingBlocks.Tests.csproj", "{52524C86-C96D-4694-9B38-8D0538B3BED2}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -82,6 +84,10 @@ Global
 		{1DCF3EF7-E583-4CBA-9A49-0F501626A9FE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1DCF3EF7-E583-4CBA-9A49-0F501626A9FE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{1DCF3EF7-E583-4CBA-9A49-0F501626A9FE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{52524C86-C96D-4694-9B38-8D0538B3BED2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{52524C86-C96D-4694-9B38-8D0538B3BED2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{52524C86-C96D-4694-9B38-8D0538B3BED2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{52524C86-C96D-4694-9B38-8D0538B3BED2}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{1BCB868D-DB90-40C7-8C29-C9905665F823} = {ECA8441A-52EE-48BA-9AA5-08C2E0AE163C}
@@ -95,5 +101,6 @@ Global
 		{11147D1D-6890-4911-9EC2-5AB3045C23A4} = {ECA8441A-52EE-48BA-9AA5-08C2E0AE163C}
 		{09BDDBBC-14AA-40B7-8545-F71BE4800F97} = {ECA8441A-52EE-48BA-9AA5-08C2E0AE163C}
 		{1DCF3EF7-E583-4CBA-9A49-0F501626A9FE} = {4C51F96D-F889-43CB-9F87-31EF7C3E51F7}
+		{52524C86-C96D-4694-9B38-8D0538B3BED2} = {4C51F96D-F889-43CB-9F87-31EF7C3E51F7}
 	EndGlobalSection
 EndGlobal
