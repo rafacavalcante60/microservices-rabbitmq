@@ -261,7 +261,7 @@ Legenda: `[ ]` pendente · `[~]` em andamento · `[x]` concluída
 - **Commit:** `feat(notifications): T-019 registrar notificações no mongodb`
 
 ### T-020 — Expor a consulta de notificações
-- [ ] **Depende de:** T-019
+- [x] **Depende de:** T-019
 - **Atende:** RN-13 · CA-6, CA-7, CA-13
 - **Fazer:** `GET /notifications/order/{orderId}` devolvendo as notificações do
   pedido.

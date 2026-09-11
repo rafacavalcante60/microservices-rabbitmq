@@ -1,5 +1,7 @@
 using BuildingBlocks.Health;
 using BuildingBlocks.Observability;
+using NotificationService.Api.Endpoints;
+using NotificationService.Application.GetNotifications;
 using NotificationService.Infrastructure.Messaging;
 using NotificationService.Infrastructure.Persistence;
 using Serilog;
@@ -10,6 +12,8 @@ builder.Host.UseJsonLogging();
 
 builder.Services.AddNotificationsMongo(builder.Configuration);
 builder.Services.AddNotificationsMessaging(builder.Configuration);
+
+builder.Services.AddScoped<GetNotificationsHandler>();
 
 // Princípio VI. O check do RabbitMQ vem do MassTransit (`masstransit-bus`), como
 // nos outros serviços.
@@ -34,5 +38,6 @@ await app.Services.EnsureNotificationIndexesAsync();
 app.MapGet("/", () => "NotificationService");
 
 app.MapDefaultHealthChecks();
+app.MapNotificationsEndpoints();
 
 app.Run();
