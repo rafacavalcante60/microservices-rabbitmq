@@ -1,32 +1,20 @@
-# Sistema de Pedidos — Microsserviços .NET 8 + RabbitMQ
+# Sistema de pedidos: microsserviços .NET 8 + RabbitMQ
 
-Sistema de pedidos de e-commerce em microsserviços, com comunicação por eventos
-assíncronos no RabbitMQ. O pedido é aceito imediatamente, a cobrança acontece
-depois e o cliente é notificado quando houver resultado.
+Um pedido de e-commerce atravessa três serviços que só conversam por eventos no
+RabbitMQ. O cliente recebe a resposta na hora, a cobrança acontece depois, e a
+notificação chega quando houver resultado.
 
-> Status: em construção, 8 de 28 tarefas concluídas. O `OrderService` já aceita
-> um pedido por `POST /orders`, persiste no PostgreSQL e publica `OrderCreated`
-> pelo padrão outbox — inclusive com o RabbitMQ fora do ar. O `PaymentService` e
-> o `NotificationService` ainda não consomem nada. O [roadmap](#roadmap) mostra
-> o andamento.
+O projeto é pequeno de propósito. Ele existe para mostrar que os problemas de
+sistemas distribuídos foram tratados, não para ter muitas funcionalidades:
+evento que se perde entre o banco e o broker, mensagem entregue duas vezes,
+cliente que clica duas vezes no botão, processador de pagamento que não
+responde, broker fora do ar no meio da operação.
 
----
-
-## O problema
-
-O cliente não pode ficar esperando a confirmação de um pagamento que depende de
-um processador externo, pode demorar ou pode não responder. O sistema precisa
-aceitar o pedido na hora e resolver a cobrança depois, sem perder nada no
-caminho. É um cenário de consistência eventual.
-
-## Arquitetura
-
-Três serviços de domínio se comunicam apenas por eventos. Não há orquestrador:
-cada serviço reage a fatos que já aconteceram. Esse modelo se chama coreografia.
+## O que acontece quando alguém cria um pedido
 
 ```mermaid
 flowchart LR
-    C[Cliente] -->|POST /orders| GW[API Gateway<br/>YARP]
+    C[Cliente] -->|POST /orders| GW[API Gateway<br/>YARP :8080]
     GW --> OS[OrderService]
 
     OS -.->|OrderCreated| MQ{{RabbitMQ}}
@@ -37,82 +25,160 @@ flowchart LR
 
     OS --- ODB[(PostgreSQL<br/>orders_db)]
     PS --- PDB[(PostgreSQL<br/>payments_db)]
-    NS --- NDB[(MongoDB<br/>notifications)]
+    NS --- NDB[(MongoDB<br/>notifications_db)]
 ```
 
-1. O cliente cria o pedido e recebe de imediato o identificador e a situação
-   `Pending`, sem esperar pelo pagamento.
-2. `OrderService` persiste o pedido e publica `OrderCreated`.
-3. `PaymentService` consome, decide a cobrança e publica um dos três desfechos.
-4. `OrderService` consome o desfecho e move o pedido para o estado final.
-5. `NotificationService` consome o mesmo desfecho, em paralelo, e registra a
+1. O `OrderService` valida, grava o pedido e responde `201 Pending`. O cliente
+   termina aqui, sem esperar pela cobrança.
+2. Na mesma transação da gravação, o evento `OrderCreated` vai para a tabela
+   outbox. Um processo separado publica no RabbitMQ.
+3. O `PaymentService` consome, decide a cobrança (acima de R$ 10.000,00 recusa)
+   e publica um dos três desfechos.
+4. O `OrderService` consome o desfecho e move o pedido para o estado final.
+5. O `NotificationService` consome o mesmo desfecho, em paralelo, e registra a
    notificação.
 
-Nenhum serviço acessa o banco de outro. Um schema compartilhado acoplaria os
-serviços no nível dos dados e tiraria a possibilidade de evoluí-los em separado.
+Os passos 4 e 5 não têm ordem entre si. Por alguns milissegundos existe uma
+notificação de pagamento aprovado enquanto o pedido ainda consta `Pending`. Isso
+é consistência eventual, e é intencional: encadear os dois traria de volta o
+acoplamento síncrono que a arquitetura evita.
 
-## Decisões técnicas
+Nenhum serviço chama outro por HTTP, e nenhum lê o banco do outro.
 
-As decisões abaixo valem para o sistema inteiro, mas nem todas já estão em
-código. As que ainda não estão trazem um aviso com a tarefa em que chegam.
+Detalhes em [`docs/architecture.md`](docs/architecture.md).
 
-### Outbox
+## Rodando
 
-Salvar o pedido no PostgreSQL e publicar `OrderCreated` no RabbitMQ são duas
-operações em sistemas diferentes. Se a segunda falha depois da primeira, o
-pedido existe e ninguém fica sabendo, e o sistema fica inconsistente sem gerar
-erro.
+Requisitos: Docker e .NET 8 SDK.
 
-O evento é gravado na mesma transação do pedido, numa tabela `outbox`, e um
-processo separado publica a partir dali.
+```bash
+git clone https://github.com/rafacavalcante60/microservices-rabbitmq.git
+cd microservices-rabbitmq
+docker compose up --build
+```
 
-Isso já é verificável: com o RabbitMQ parado, o `POST /orders` continua
-respondendo `201` e o evento fica esperando na tabela `outbox_message`. Quando o
-broker volta, a linha some da tabela e a mensagem aparece no exchange, sem
-nenhuma intervenção.
+Isso sobe RabbitMQ, PostgreSQL, MongoDB, Redis e os quatro serviços .NET. As
+migrations rodam sozinhas no startup, e o compose espera cada dependência ficar
+saudável antes de subir quem depende dela. Na primeira vez o build das imagens
+leva alguns minutos.
 
-### Consumidores idempotentes
+Quando terminar:
 
-> Parcial: vale para o PaymentService (T-016, T-017). Chega ao OrderService e ao
-> NotificationService nas T-018 e T-019.
+- API pelo gateway: <http://localhost:8080>
+- Painel do RabbitMQ: <http://localhost:15672>, usuário `guest`, senha `guest`
 
-RabbitMQ garante entrega pelo menos uma vez, então mensagem repetida é um caso
-normal: basta um `ack` se perder para a mesma mensagem chegar de novo.
+## Demonstração
 
-Um filtro no pipeline do MassTransit registra o `MessageId` no Redis com
-`SET NX EX` e descarta o que já foi processado, sem que nenhum consumidor
-precise lembrar de se proteger. Como garantia adicional, o banco tem restrições
-únicas (`payments.order_id`, e `notifications.orderId` na T-019): se o Redis
-ficar indisponível, o filtro falha aberto e é a constraint que impede o dano.
+Os três `curl` abaixo passam pelo gateway na porta 8080 e mostram os caminhos
+que importam. Cada um deles está coberto por um teste de integração.
 
-### Tratamento de falhas
+### Pagamento aprovado
 
-O domínio separa pagamento recusado (o processador respondeu "não", é decisão de
-negócio) de pagamento falhou (o processador não respondeu, é problema técnico).
-A ação de suporte é diferente em cada caso, e por isso são dois eventos
-distintos em `Shared.Contracts`.
+```bash
+curl -sX POST localhost:8080/orders \
+  -H 'Content-Type: application/json' \
+  -H 'Idempotency-Key: demo-aprovado-1' \
+  -d '{"customerId":"11111111-1111-1111-1111-111111111111",
+       "items":[{"productId":"22222222-2222-2222-2222-222222222222",
+                 "productName":"Teclado","quantity":2,"unitPrice":250.00}]}'
+# 201 {"orderId":"<id>","status":"Pending","totalAmount":500.00}
+```
 
-> Parcial: vale para o PaymentService (T-014, T-017). Os demais consumidores
-> chegam nas T-018 e T-019.
+Guarde o `orderId` e consulte um segundo depois:
 
-São **dois** retries, e eles não se confundem. A chamada ao processador tem
-política Polly de 5 tentativas com backoff exponencial: esgotadas, o desfecho é
-`PaymentFailed` e o cliente é notificado — falha de gateway é caminho de
-negócio, não incidente. O consumidor tem o retry do MassTransit, de 3
-tentativas, para falha de infraestrutura (o banco caiu); o que falhar nas três
-vai para a dead-letter queue com log de erro, nunca descartado em silêncio.
+```bash
+curl -s localhost:8080/orders/<id>
+# {"status":"Paid", ...}
 
-Juntar os dois faria um Postgres fora do ar virar "pagamento recusado" na cara
-do cliente.
+curl -s localhost:8080/notifications/order/<id>
+# [{"type":"OrderPaid","message":"Pagamento de R$ 500,00 confirmado...", ...}]
+```
 
-### Rastreabilidade
+O pedido nasceu `Pending` e virou `Paid` sem ninguém perguntar nada a ninguém.
+A mudança veio de dois eventos atravessando o broker.
 
-> Parcial: o identificador já atravessa Orders → Payments e aparece nos logs
-> JSON dos dois. Ele passa a nascer no gateway na T-021; hoje nasce na criação
-> do pedido.
+### Pagamento recusado
 
-Todo evento carrega um `CorrelationId` propagado pela cadeia inteira, o que
-permite seguir um fluxo assíncrono de três saltos nos logs.
+Um centavo acima do limite de R$ 10.000,00:
+
+```bash
+curl -sX POST localhost:8080/orders \
+  -H 'Content-Type: application/json' \
+  -H 'Idempotency-Key: demo-recusado-1' \
+  -d '{"customerId":"11111111-1111-1111-1111-111111111111",
+       "items":[{"productId":"22222222-2222-2222-2222-222222222222",
+                 "productName":"Notebook","quantity":1,"unitPrice":10000.01}]}'
+```
+
+O pedido termina em `PaymentDeclined`, com o motivo no campo `statusReason`
+("Valor de R$ 10.000,01 acima do limite de R$ 10.000,00 do processador."), e
+a notificação registrada é do tipo `PaymentDeclined`. Recusado é diferente de
+falhou: recusado é decisão do processador, falhou é ausência de resposta. São
+dois eventos distintos porque a ação de suporte é diferente em cada caso.
+
+### Criação repetida
+
+Repita o primeiro comando com a mesma `Idempotency-Key`:
+
+```bash
+curl -isX POST localhost:8080/orders \
+  -H 'Content-Type: application/json' \
+  -H 'Idempotency-Key: demo-aprovado-1' \
+  -d '{"customerId":"11111111-1111-1111-1111-111111111111",
+       "items":[{"productId":"22222222-2222-2222-2222-222222222222",
+                 "productName":"Teclado","quantity":2,"unitPrice":250.00}]}'
+# HTTP/1.1 200 OK, com o mesmo orderId da primeira resposta
+```
+
+`200` em vez de `201`, porque nada foi criado desta vez, e o mesmo identificador
+de volta. Quem é responsável por decidir se é retentativa ou compra nova é o
+cliente, através da chave: dois pedidos idênticos em sequência podem ser ambos
+intencionais, e nenhuma heurística sobre o conteúdo acerta isso.
+
+### Vendo o broker trabalhar
+
+O painel em <http://localhost:15672> mostra as filas. Cada evento tem um
+exchange e uma fila por serviço consumidor: `payments-order-created`,
+`orders-payment-approved`, `notifications-payment-approved` e assim por diante.
+O prefixo por serviço existe para que os dois assinantes do mesmo desfecho não
+dividam a mesma fila, o que faria cada evento chegar a só um deles.
+
+## Padrões usados, e o motivo de cada um
+
+Outbox: o evento é gravado na mesma transação do pedido, e outro processo
+publica a partir da tabela. Sem ele, um processo que morre entre o commit e a
+publicação deixa um pedido que ninguém vai cobrar, sem erro nenhum.
+Explicado por dentro em [ADR 0001](docs/decisions/0001-outbox.md).
+
+Idempotência de consumidor: cada consumidor registra o `MessageId` no Redis
+antes de processar e descarta o que já viu. O RabbitMQ entrega pelo menos uma
+vez, então uma reentrega sem essa proteção vira segunda cobrança no cartão do
+cliente.
+
+Idempotência de criação: índice único em `(customer_id, idempotency_key)`. O
+banco recusa a segunda inserção, sem janela de corrida entre verificar e gravar.
+
+Dois retries separados: Polly para o processador de pagamento, com até 5
+tentativas e backoff exponencial, porque gateway fora do ar é caminho de negócio
+previsto e termina em `PaymentFailed` com o cliente avisado. MassTransit para o
+consumidor, com 3 tentativas e dead-letter queue, porque banco fora do ar é
+defeito de infraestrutura. Um retry só transformaria um PostgreSQL indisponível
+em "pagamento falhou" na cara do cliente.
+
+Dead-letter queue: o que falha nas três tentativas vai para a fila `_error` com
+log. Nada é descartado em silêncio, nada fica em loop infinito de reentrega.
+
+CorrelationId: nasce no gateway, segue no header até o `OrderService` e depois
+viaja dentro de cada evento. Sem ele, depurar um fluxo assíncrono de três saltos
+vira adivinhação.
+
+Health checks: `/health` responde se o processo está vivo, `/health/ready` se as
+dependências estão alcançáveis. É o que impede o orquestrador de mandar tráfego
+para um serviço que ainda não alcança o próprio banco.
+
+Um banco por serviço: Orders e Payments em PostgreSQL, cada um no seu; o
+histórico de notificações em MongoDB. Schema compartilhado seria um monólito
+distribuído, com o custo de operar três serviços e o acoplamento de um.
 
 ## Stack
 
@@ -120,67 +186,50 @@ permite seguir um fluxo assíncrono de três saltos nos logs.
 |---|---|
 | Runtime | .NET 8 (LTS) |
 | Mensageria | RabbitMQ via MassTransit |
-| Banco transacional | PostgreSQL + EF Core (bancos separados por serviço) |
-| Banco documental | MongoDB (histórico de notificações) |
-| Cache / idempotência | Redis |
+| Banco transacional | PostgreSQL + EF Core, bancos separados por serviço |
+| Banco documental | MongoDB, histórico de notificações |
+| Cache e idempotência | Redis |
 | Gateway | YARP |
 | Logs | Serilog estruturado, saída JSON |
-| Testes | xUnit + FluentAssertions + Testcontainers |
+| Testes | xUnit, FluentAssertions, Testcontainers |
 | Orquestração local | Docker Compose |
 
-MassTransit em vez de `RabbitMQ.Client` puro porque já traz retry, DLQ,
-serialização e outbox prontos, o que evita reimplementar essa camada à mão.
+MassTransit em vez de `RabbitMQ.Client` puro porque retry, DLQ, serialização e
+outbox já vêm prontos e testados. Escrever isso à mão consumiria o projeto em
+encanamento, e o ADR do outbox existe para que usar a biblioteca não custe o
+entendimento do mecanismo.
 
-Dois tipos de banco porque os padrões de acesso são diferentes: Orders e
-Payments precisam de transação e integridade referencial; Notifications é
+Dois tipos de banco porque os padrões de acesso são diferentes. Orders e
+Payments precisam de transação e integridade referencial. Notifications é
 histórico append-only, com formato que varia por canal.
 
-## Rodando localmente
-
-Requisitos: Docker e .NET 8 SDK.
+## Testes
 
 ```bash
-git clone https://github.com/rafacavalcante60/microservices-rabbitmq.git
-cd microservices-rabbitmq
-
-# Sobe RabbitMQ, PostgreSQL, MongoDB e Redis
-docker compose up -d
-
-# Testes de domínio, rodam sem infraestrutura
 dotnet test
 ```
 
-Painel do RabbitMQ: <http://localhost:15672> (`guest` / `guest`)
+Os testes de domínio rodam sem infraestrutura. Os de integração sobem RabbitMQ,
+PostgreSQL, MongoDB e Redis de verdade em contêineres descartáveis, via
+Testcontainers, e atravessam os três serviços. Não há mock de broker: o que
+costuma quebrar em mensageria é a serialização do contrato, o nome da fila e o
+roteamento do exchange, justamente o que um broker falso não exercita.
 
-Com a infraestrutura de pé, o serviço de pedidos roda direto pelo SDK:
-
-```bash
-dotnet run --project src/OrderService --urls http://localhost:8081
-
-curl -X POST localhost:8081/orders \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "customerId": "11111111-1111-1111-1111-111111111111",
-    "items": [
-      {"productId":"22222222-2222-2222-2222-222222222222","productName":"Teclado","quantity":2,"unitPrice":10.00},
-      {"productId":"33333333-3333-3333-3333-333333333333","productName":"Mouse","quantity":3,"unitPrice":5.00}
-    ]
-  }'
-# 201 → {"orderId":"…","status":"Pending","totalAmount":35.00}
-```
-
-O total nasce da soma dos itens: um `totalAmount` enviado no corpo não é lido,
-porque o campo não existe no contrato de entrada.
-
-> Os serviços ainda não sobem pelo Compose, isso chega na T-022. O pedido também
-> ainda não sai de `Pending`: quem o move é o desfecho do pagamento, na T-018.
+Os caminhos ruins são testados junto com o caminho feliz: chave de idempotência
+repetida, evento reentregue com o mesmo `MessageId`, gateway que nunca responde,
+gateway que falha duas vezes e aprova na terceira, e um pedido criado com o
+RabbitMQ derrubado no meio, que completa o fluxo quando o broker volta.
 
 ## Estrutura
 
 ```
-├── specs/                   # spec, plano e tarefas de cada feature
+├── specs/                   # spec, plano e tarefas da feature
+├── docs/
+│   ├── architecture.md      # visão geral, diagramas, fronteiras
+│   └── decisions/           # ADRs
 ├── src/
-│   ├── Shared.Contracts/    # contratos de evento, sem dependências
+│   ├── Shared.Contracts/    # contratos de evento
+│   ├── BuildingBlocks/      # idempotência, health, correlação
 │   ├── ApiGateway/
 │   ├── OrderService/        # + OrderService.Domain
 │   ├── PaymentService/      # + PaymentService.Domain
@@ -189,36 +238,29 @@ porque o campo não existe no contrato de entrada.
 └── docker-compose.yml
 ```
 
-Cada serviço segue `Api` → `Application` → `Domain` ← `Infrastructure`, com as
-dependências apontando para dentro. O domínio é um projeto separado sem nenhum
-`PackageReference`, então um `using` de EF Core nas regras de negócio não
-compila.
+Cada serviço se organiza em `Api`, `Application`, `Domain` e `Infrastructure`,
+com as dependências apontando para dentro. O domínio é um projeto separado sem
+nenhum `PackageReference`, então um `using` de EF Core dentro das regras de
+negócio não compila.
 
-## Roadmap
+## Como este projeto foi construído
 
-| Etapa | Tarefas | Status |
-|---|---|---|
-| Fundação — solução, Docker Compose, contratos | T-001 → T-003 | ✅ |
-| Domínio de pedidos | T-004 → T-005 | ✅ |
-| OrderService — persistência, outbox, `POST /orders` | T-006 → T-008 | ✅ |
-| OrderService — idempotência, consulta, observabilidade | T-009 → T-011 | ⬜ |
-| PaymentService — regra, retry, consumidor | T-012 → T-017 | ⬜ |
-| Fluxo completo ponta a ponta | T-018 | ⬜ |
-| Notificações e API Gateway | T-019 → T-021 | ⬜ |
-| Tudo em contêineres | T-022 | ⬜ |
-| Testes de integração com Testcontainers | T-023 → T-026 | ⬜ |
-| ADRs e documentação | T-027 → T-028 | ⬜ |
-
-## Como este projeto é construído
-
-Desenvolvimento spec-driven: nenhuma linha de código de produção é escrita antes
-de existir uma spec aprovada e um plano derivado dela.
+Desenvolvimento spec-driven: nenhuma linha de código de produção foi escrita
+antes de existir uma spec aprovada e um plano derivado dela.
 
 ```
-spec (o quê e por quê) → plano (como) → tarefas → código → teste verde
+spec (o quê e por quê) -> plano (como) -> tarefas -> código -> teste verde
 ```
 
-- [`specs/001-pedido-pagamento-notificacao/spec.md`](specs/001-pedido-pagamento-notificacao/spec.md) — 15 regras de negócio e 16 critérios de aceite, em linguagem de negócio
-- [`specs/001-pedido-pagamento-notificacao/plan.md`](specs/001-pedido-pagamento-notificacao/plan.md) — cada decisão técnica com a justificativa e a alternativa descartada
+A spec descreve comportamento em linguagem de negócio e não menciona classe,
+tabela ou nome de fila. O plano responde como, e cada decisão técnica carrega a
+justificativa e a alternativa descartada. As tarefas são pequenas o bastante
+para um commit cada.
 
-Um commit por tarefa concluída.
+- [`CONSTITUTION.md`](CONSTITUTION.md): as regras que nenhuma spec pode violar
+- [`specs/001-pedido-pagamento-notificacao/spec.md`](specs/001-pedido-pagamento-notificacao/spec.md): 15 regras de negócio e 16 critérios de aceite
+- [`specs/001-pedido-pagamento-notificacao/plan.md`](specs/001-pedido-pagamento-notificacao/plan.md): as decisões técnicas, com alternativas
+- [`specs/001-pedido-pagamento-notificacao/tasks.md`](specs/001-pedido-pagamento-notificacao/tasks.md): as 28 tarefas, na ordem em que foram executadas
+
+O histórico do git segue as tarefas, um commit cada, e cada commit referencia o
+identificador da tarefa.

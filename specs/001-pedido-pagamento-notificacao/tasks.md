@@ -370,7 +370,7 @@ Legenda: `[ ]` pendente · `[~]` em andamento · `[x]` concluída
 - **Commit:** `docs: T-027 escrever adr do outbox e visão de arquitetura`
 
 ### T-028 — Escrever o README
-- [ ] **Depende de:** T-022, T-026, T-027
+- [x] **Depende de:** T-022, T-026, T-027
 - **Atende:** critério de sucesso da constituição
 - **Fazer:** README com o diagrama do fluxo, como rodar em um comando, os `curl`
   de demonstração (aprovado, recusado, idempotente), os padrões usados com uma
