@@ -306,7 +306,7 @@ Legenda: `[ ]` pendente · `[~]` em andamento · `[x]` concluída
 ## Testes de integração
 
 ### T-023 — Montar a base de testes com Testcontainers
-- [ ] **Depende de:** T-022
+- [x] **Depende de:** T-022
 - **Atende:** princípio IX
 - **Fazer:** `IAsyncLifetime` compartilhado subindo RabbitMQ, PostgreSQL,
   MongoDB e Redis reais; `WebApplicationFactory` para os serviços; utilitário de
