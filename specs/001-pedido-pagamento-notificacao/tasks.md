@@ -159,7 +159,7 @@ Legenda: `[ ]` pendente · `[~]` em andamento · `[x]` concluída
 ## Domínio e serviço de pagamentos
 
 ### T-012 — Modelar o agregado Payment e a regra de aprovação
-- [ ] **Depende de:** T-001
+- [x] **Depende de:** T-001
 - **Atende:** RN-10 · CA-7, CA-8
 - **Fazer:** entidade `Payment` e a regra determinística: acima de
   R$ 10.000,00 recusa, `10.000,00` exato aprova. Testes nos dois lados do limite
