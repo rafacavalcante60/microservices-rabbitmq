@@ -218,7 +218,7 @@ Legenda: `[ ]` pendente · `[~]` em andamento · `[x]` concluída
 - **Commit:** `feat(shared): T-016 criar filtro de idempotência de consumidor`
 
 ### T-017 — Consumir OrderCreated e publicar o desfecho
-- [ ] **Depende de:** T-014, T-015, T-016
+- [x] **Depende de:** T-014, T-015, T-016
 - **Atende:** RN-9, RN-10, RN-11 · CA-6, CA-7, CA-13
 - **Fazer:** `OrderCreatedConsumer`: aplica o filtro de idempotência, cobra pelo
   gateway com a política de retry, grava `payments` e publica
