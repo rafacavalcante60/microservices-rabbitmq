@@ -1,6 +1,7 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using OrderService.Application.CreateOrder;
+using OrderService.Application.GetOrder;
 
 namespace OrderService.Api.Endpoints;
 
@@ -12,6 +13,13 @@ public static class OrdersEndpoints
     {
         app.MapPost("/orders", CreateOrderAsync)
             .WithName("CreateOrder");
+
+        // A restrição `:guid` na rota não é enfeite: um id malformado deixa de
+        // casar com a rota e vira 404 antes de chegar ao handler, em vez de
+        // explodir na conversão. Lixo na URL e pedido inexistente são a mesma
+        // resposta para quem consulta — nenhum dos dois existe.
+        app.MapGet("/orders/{orderId:guid}", GetOrderAsync)
+            .WithName("GetOrder");
 
         return app;
     }
@@ -64,7 +72,28 @@ public static class OrdersEndpoints
         }
 
         // 201 com Location: a requisição criou um recurso novo e agora ele tem
-        // endereço próprio — o GET /orders/{id} da T-010.
+        // endereço próprio — o GET /orders/{id} logo abaixo.
         return Results.Created($"/orders/{result.Response.OrderId}", result.Response);
+    }
+
+    private static async Task<IResult> GetOrderAsync(
+        Guid orderId,
+        GetOrderHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var order = await handler.HandleAsync(orderId, cancellationToken);
+
+        // CA-16 / FA-5. O 404 sai como ProblemDetails, e não como corpo vazio,
+        // para que a API tenha um formato de erro só: quem já sabe ler o 400 da
+        // criação lê este sem código novo.
+        if (order is null)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status404NotFound,
+                title: "Pedido não encontrado.",
+                detail: $"Não existe pedido com o identificador {orderId}.");
+        }
+
+        return Results.Ok(order);
     }
 }

@@ -132,7 +132,7 @@ Legenda: `[ ]` pendente · `[~]` em andamento · `[x]` concluída
 - **Commit:** `feat(orders): T-009 garantir idempotência na criação do pedido`
 
 ### T-010 — Expor GET /orders/{id}
-- [ ] **Depende de:** T-008
+- [x] **Depende de:** T-008
 - **Atende:** CA-15, CA-16
 - **Fazer:** endpoint de consulta devolvendo o pedido com itens, situação, motivo
   e total; `404` quando não existe.

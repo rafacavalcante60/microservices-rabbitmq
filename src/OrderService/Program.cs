@@ -2,6 +2,7 @@ using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using OrderService.Api.Endpoints;
 using OrderService.Application.CreateOrder;
+using OrderService.Application.GetOrder;
 using OrderService.Infrastructure.Messaging;
 using OrderService.Infrastructure.Persistence;
 
@@ -19,6 +20,7 @@ builder.Services.AddProblemDetails();
 
 builder.Services.AddValidatorsFromAssemblyContaining<CreateOrderValidator>();
 builder.Services.AddScoped<CreateOrderHandler>();
+builder.Services.AddScoped<GetOrderHandler>();
 
 var app = builder.Build();
 
