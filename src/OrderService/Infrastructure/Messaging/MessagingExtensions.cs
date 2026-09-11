@@ -1,4 +1,6 @@
+using BuildingBlocks.Messaging;
 using MassTransit;
+using OrderService.Application.Consumers;
 using OrderService.Infrastructure.Persistence;
 
 namespace OrderService.Infrastructure.Messaging;
@@ -23,8 +25,17 @@ public static class MessagingExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        services.AddRedisIdempotency(configuration.GetConnectionString("Redis")!);
+
         services.AddMassTransit(bus =>
         {
+            // T-018. Os três desfechos chegam em contratos separados, então são
+            // três consumidores e três filas — cada um falha, retenta e vai
+            // para a DLQ sem arrastar os outros.
+            bus.AddConsumer<PaymentApprovedConsumer>();
+            bus.AddConsumer<PaymentDeclinedConsumer>();
+            bus.AddConsumer<PaymentFailedConsumer>();
+
             bus.AddEntityFrameworkOutbox<OrdersDbContext>(outbox =>
             {
                 outbox.UsePostgres();
@@ -44,6 +55,18 @@ public static class MessagingExtensions
             bus.UsingRabbitMq((context, rabbit) =>
             {
                 rabbit.Host(new Uri(configuration.GetConnectionString("RabbitMq")!));
+
+                // Princípio IV: aplicado ao pipeline inteiro, antes de qualquer
+                // consumidor. O mesmo desfecho reentregue não transiciona duas
+                // vezes — e mesmo que o Redis esteja fora (R-4, falha aberta), a
+                // guarda de estado no agregado segura a correção.
+                rabbit.UseIdempotency(context);
+
+                // D-7. Retry de **infraestrutura** — o Postgres piscou, a
+                // conexão caiu. O que falhar nas três tentativas vai para a
+                // fila `_error` com log, nunca é descartado (princípio VI).
+                rabbit.UseMessageRetry(retry => retry.Interval(3, TimeSpan.FromSeconds(2)));
+
                 rabbit.ConfigureEndpoints(context);
             });
         });

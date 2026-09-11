@@ -231,7 +231,7 @@ Legenda: `[ ]` pendente · `[~]` em andamento · `[x]` concluída
 - **Commit:** `feat(payments): T-017 consumir OrderCreated e publicar desfecho`
 
 ### T-018 — Aplicar o desfecho ao pedido 🏁
-- [ ] **Depende de:** T-005, T-017
+- [x] **Depende de:** T-005, T-017
 - **Atende:** RN-7 · CA-6, CA-7, CA-9
 - **Fazer:** consumidores dos três desfechos no OrderService, chamando as
   transições do agregado (T-005). Filtro de idempotência aplicado.
