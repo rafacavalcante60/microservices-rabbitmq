@@ -327,7 +327,7 @@ Legenda: `[ ]` pendente · `[~]` em andamento · `[x]` concluída
 - **Commit:** `test: T-024 testar fluxo ponta a ponta aprovado e recusado`
 
 ### T-025 — Testar as duas idempotências
-- [ ] **Depende de:** T-023
+- [x] **Depende de:** T-023
 - **Atende:** RN-8, RN-9, RN-12 · CA-10, CA-11, CA-12
 - **Fazer:** criação com a mesma chave duas vezes → um pedido, `201` e `200`;
   chaves diferentes → dois pedidos; `OrderCreated` publicado duas vezes com o
