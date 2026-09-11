@@ -337,13 +337,19 @@ Legenda: `[ ]` pendente · `[~]` em andamento · `[x]` concluída
 - **Commit:** `test: T-025 testar idempotência de criação e de consumidor`
 
 ### T-026 — Testar falha do gateway e resiliência do outbox
-- [ ] **Depende de:** T-023
+- [x] **Depende de:** T-023
 - **Atende:** RN-11 · CA-13, CA-14 · R-1
 - **Fazer:** gateway configurado para nunca responder → após 5 tentativas o
   pedido vai a `PaymentFailed` com uma notificação; gateway que falha 2 vezes e
   aprova na 3ª → `Paid` sem notificação de falha; criar pedido com o RabbitMQ
   pausado, religar, verificar que o fluxo completa.
-- **Arquivos:** `tests/Integration.Tests/ResilienceTests.cs`
+- **Arquivos:** `tests/Integration.Tests/ResilienceTests.cs`,
+  `tests/Integration.Tests/Fixtures/ScriptedPaymentGateway.cs`,
+  `tests/Integration.Tests/Fixtures/IntegrationFixture.cs` *(dois arquivos de
+  fixture a mais do que o previsto: o gateway simulado só cai por configuração
+  global lida na construção, então CA-13/CA-14 exigiram um dublê que derruba o
+  processador de um pedido só, e R-1 exigiu controle do broker a partir do
+  teste)*
 - **Verificar:** `dotnet test --filter Resilience` → verdes
 - **Commit:** `test: T-026 testar falha do gateway e resiliência do outbox`
 

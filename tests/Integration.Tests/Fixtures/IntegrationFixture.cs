@@ -1,7 +1,11 @@
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
 using NotificationService;
 using OrderService;
 using PaymentService;
+using PaymentService.Domain;
+using PaymentService.Infrastructure;
 using Testcontainers.MongoDb;
 using Testcontainers.PostgreSql;
 using Testcontainers.RabbitMq;
@@ -56,6 +60,12 @@ public sealed class IntegrationFixture : IAsyncLifetime
 
     public HttpClient NotificationsClient { get; private set; } = null!;
 
+    // O dublê que T-026 usa para derrubar o gateway de um pedido só. Sem
+    // roteiro escrito, ele delega ao simulador de verdade — ver
+    // ScriptedPaymentGateway.
+    public ScriptedPaymentGateway Gateway => (ScriptedPaymentGateway)Payments.Services
+        .GetRequiredService<IPaymentGateway>();
+
     public string MongoConnectionString => _mongo.GetConnectionString();
 
     public string RedisConnectionString => _redis.GetConnectionString();
@@ -79,7 +89,16 @@ public sealed class IntegrationFixture : IAsyncLifetime
         ApplyConfiguration();
 
         Orders = new WebApplicationFactory<OrderServiceEntryPoint>();
-        Payments = new WebApplicationFactory<PaymentServiceEntryPoint>();
+
+        // O registro entra depois do Program.cs, e o último a registrar
+        // IPaymentGateway é quem responde — o simulador continua no contêiner
+        // como tipo concreto, para o dublê poder delegar a ele.
+        Payments = new WebApplicationFactory<PaymentServiceEntryPoint>()
+            .WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
+            {
+                services.AddSingleton<SimulatedPaymentGateway>();
+                services.AddSingleton<IPaymentGateway, ScriptedPaymentGateway>();
+            }));
         Notifications = new WebApplicationFactory<NotificationServiceEntryPoint>();
 
         // O host de cada serviço só é construído no primeiro CreateClient, e é aí
@@ -113,12 +132,42 @@ public sealed class IntegrationFixture : IAsyncLifetime
             ["ConnectionStrings__PaymentsDb"] = PostgresConnectionString("payments_db"),
             ["ConnectionStrings__RabbitMq"] = _rabbitMq.GetConnectionString(),
             ["ConnectionStrings__Redis"] = RedisConnectionString,
-            ["Mongo__ConnectionString"] = MongoConnectionString
+            ["Mongo__ConnectionString"] = MongoConnectionString,
+
+            // A política de retry é a mesma da produção; só o relógio encolhe.
+            // Com os 500ms padrão, as quatro esperas de CA-13 somam 7,5s de
+            // suíte parada esperando backoff que já está coberto por teste de
+            // unidade. O que o teste de integração tem a dizer é quantas
+            // tentativas acontecem e onde o pedido termina, não quanto tempo se
+            // espera entre elas.
+            ["PaymentRetry__BaseDelay"] = "00:00:00.020"
         };
 
         foreach (var (key, value) in settings)
         {
             Environment.SetEnvironmentVariable(key, value);
+        }
+    }
+
+    // `rabbitmqctl stop_app` derruba o broker mantendo o contêiner e as portas
+    // de pé — parar o contêiner sortearia outra porta ao subir de novo, e os
+    // serviços ficariam apontando para o vazio. As filas e exchanges são
+    // duráveis, então voltam como estavam.
+    //
+    // É o que permite testar R-1: o POST continua respondendo 201 com o broker
+    // fora, porque o evento vai para a tabela outbox, não para a fila.
+    public Task StopBrokerAsync() => ExecBrokerAsync("stop_app");
+
+    public Task StartBrokerAsync() => ExecBrokerAsync("start_app");
+
+    private async Task ExecBrokerAsync(string command)
+    {
+        var result = await _rabbitMq.ExecAsync(["rabbitmqctl", command]);
+
+        if (result.ExitCode != 0)
+        {
+            throw new InvalidOperationException(
+                $"rabbitmqctl {command} falhou ({result.ExitCode}): {result.Stderr}");
         }
     }
 
